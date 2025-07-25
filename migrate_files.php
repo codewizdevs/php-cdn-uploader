@@ -264,10 +264,13 @@ foreach ($files as $filePath) {
         }
     }
     
-    // Check if database record exists
+    // Check if database record exists by filename
     $existingRecord = $pdo->query("SELECT * FROM cdn_files WHERE filename = '{$filename}'")->fetch();
     
-    if (!$existingRecord) {
+    // Check if file with same hash already exists
+    $existingHashRecord = $pdo->query("SELECT * FROM cdn_files WHERE file_hash = '{$fileHash}'")->fetch();
+    
+    if (!$existingRecord && !$existingHashRecord) {
         // Create new database record
         echo "  📝 Creating database record...\n";
         
@@ -335,6 +338,23 @@ foreach ($files as $filePath) {
         
         $createdRecords++;
         echo "  ✅ Record created successfully\n";
+        
+    } elseif ($existingHashRecord && !$existingRecord) {
+        // File with same hash exists but different filename - update the existing record
+        echo "  🔄 File with same content exists, updating existing record...\n";
+        
+        // Update the existing record with new filename and metadata
+        $stmt = $pdo->prepare("
+            UPDATE cdn_files SET 
+                filename = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE file_hash = ?
+        ");
+        
+        $stmt->execute([$filename, $fileHash]);
+        
+        $updatedRecords++;
+        echo "  ✅ Record updated with new filename\n";
         
     } else {
         // Update existing record
