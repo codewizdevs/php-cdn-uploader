@@ -201,7 +201,7 @@ class UploadHandler {
         }
         
         // Update database record
-        $this->db->execute(
+        $this->db->query(
             "UPDATE cdn_files SET 
                 filename = ?, 
                 thumb_filename = ?, 
@@ -299,7 +299,7 @@ class UploadHandler {
         }
         
         // Insert database record
-        $this->db->execute(
+        $this->db->query(
             "INSERT INTO cdn_files (
                 filename, thumb_filename, file_hash, original_width, original_height,
                 width, height, thumb_width, thumb_height, file_size, thumb_size,
@@ -558,9 +558,4 @@ class UploadHandler {
         }
     }
 }
-
-// Handle the request
-$db = new Database();
-$handler = new UploadHandler($db);
-$handler->handle();
 ?> 

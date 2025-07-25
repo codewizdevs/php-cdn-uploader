@@ -134,9 +134,4 @@ class SearchHandler {
         }
     }
 }
-
-// Handle the request
-$db = new Database();
-$handler = new SearchHandler($db);
-$handler->handle();
 ?> 

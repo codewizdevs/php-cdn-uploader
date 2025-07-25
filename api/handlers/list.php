@@ -113,9 +113,4 @@ class ListHandler {
         }
     }
 }
-
-// Handle the request
-$db = new Database();
-$handler = new ListHandler($db);
-$handler->handle();
 ?> 

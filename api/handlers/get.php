@@ -69,9 +69,4 @@ class GetHandler {
         }
     }
 }
-
-// Handle the request
-$db = new Database();
-$handler = new GetHandler($db);
-$handler->handle();
 ?> 
