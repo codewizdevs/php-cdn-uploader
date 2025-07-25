@@ -122,9 +122,8 @@ class UploadHandler {
         if ($existingFile) {
             // File with same content already exists
             if (DEDUPLICATE_UPLOADS) {
-                // Update existing record with new filename and metadata
-                $this->updateExistingFile($existingFile, $filename, $extension, $fileData, $isImage);
-                return $this->getUpdatedFileData($existingFile, $filename, $extension, $fileData, $isImage);
+                // Return existing file data without any changes
+                return $this->getExistingFileData($existingFile);
             } else {
                 // Update existing record with new filename but keep same hash
                 $this->updateExistingFile($existingFile, $filename, $extension, $fileData, $isImage);
@@ -238,6 +237,28 @@ class UploadHandler {
             'mime_type' => $updatedRecord['mime_type'],
             'created_at' => $updatedRecord['created_at'],
             'updated_at' => $updatedRecord['updated_at']
+        ];
+    }
+    
+    private function getExistingFileData($existingFile) {
+        // Return existing file data without any changes
+        return [
+            'id' => intval($existingFile['id']),
+            'filename' => $existingFile['filename'],
+            'thumb_filename' => $existingFile['thumb_filename'],
+            'file_hash' => $existingFile['file_hash'],
+            'original_width' => intval($existingFile['original_width']),
+            'original_height' => intval($existingFile['original_height']),
+            'width' => intval($existingFile['width']),
+            'height' => intval($existingFile['height']),
+            'thumb_width' => intval($existingFile['thumb_width']),
+            'thumb_height' => intval($existingFile['thumb_height']),
+            'file_size' => intval($existingFile['file_size']),
+            'thumb_size' => intval($existingFile['thumb_size']),
+            'extension' => $existingFile['extension'],
+            'mime_type' => $existingFile['mime_type'],
+            'created_at' => $existingFile['created_at'],
+            'updated_at' => $existingFile['updated_at']
         ];
     }
     

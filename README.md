@@ -416,7 +416,7 @@ X-API-Key: your-secure-api-key-here
 
 The system uses MD5 hash-based deduplication:
 
-- **Enabled** (`DEDUPLICATE_UPLOADS = true`): Same content = same file, replaces existing files
+- **Enabled** (`DEDUPLICATE_UPLOADS = true`): Same content = same file, returns existing file data without changes
 - **Disabled** (`DEDUPLICATE_UPLOADS = false`): 
   - If hash matches: Updates existing record with new filename (same content, new name)
   - If hash doesn't match but filename does: Creates new file with appended name (e.g., `image_2.jpg`)
