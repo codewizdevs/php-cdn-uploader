@@ -416,8 +416,11 @@ X-API-Key: your-secure-api-key-here
 
 The system uses MD5 hash-based deduplication:
 
-- **Enabled** (`DEDUPLICATE_UPLOADS = true`): Same content = same file
-- **Disabled** (`DEDUPLICATE_UPLOADS = false`): Creates new records for all uploads
+- **Enabled** (`DEDUPLICATE_UPLOADS = true`): Same content = same file, replaces existing files
+- **Disabled** (`DEDUPLICATE_UPLOADS = false`): 
+  - If hash matches: Creates new record with unique filename (e.g., `image_2.jpg`)
+  - If hash doesn't match but filename does: Creates new file with appended name (e.g., `image_2.jpg`)
+  - Preserves all files, never deletes existing content
 
 ### Filename Normalization
 

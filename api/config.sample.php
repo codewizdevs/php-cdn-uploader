@@ -47,7 +47,7 @@ define('ALLOWED_EXTENSIONS', [
 define('THUMBNAIL_EXTENSIONS', ['jpg', 'jpeg', 'png']);
 
 // Upload Configuration
-define('DEDUPLICATE_UPLOADS', true); // If true, replace existing files; if false, create new records with appended numbers
+define('DEDUPLICATE_UPLOADS', false); // If true, replace existing files; if false, create new records with appended numbers
 define('NORMALIZE_FILENAMES', true); // If true, normalize filenames to be filesystem-safe; if false, use as-is
 
 // Create directories if they don't exist
