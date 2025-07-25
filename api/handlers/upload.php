@@ -156,13 +156,8 @@ class UploadHandler {
         );
         
         if ($filenameConflict) {
-            if (DEDUPLICATE_UPLOADS) {
-                // Delete existing file with different content
-                $this->deleteFiles($filenameConflict['filename'], $filenameConflict['thumb_filename']);
-            } else {
-                // Generate unique filename
-                $finalFilename = $this->generateUniqueFilename($filename);
-            }
+            // Always generate unique filename for filename conflicts (different content)
+            $finalFilename = $this->generateUniqueFilename($filename);
         }
         
         return $this->createNewFileRecord($fileData, $finalFilename, $fileHash, $extension, $mimeType, $isImage);
