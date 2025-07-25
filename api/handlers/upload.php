@@ -126,9 +126,9 @@ class UploadHandler {
                 $this->updateExistingFile($existingFile, $filename, $extension, $fileData, $isImage);
                 return $this->getUpdatedFileData($existingFile, $filename, $extension, $fileData, $isImage);
             } else {
-                // Create new record with different filename but same hash
-                $finalFilename = $this->generateUniqueFilename($filename);
-                return $this->createNewFileRecord($fileData, $finalFilename, $fileHash, $extension, $mimeType, $isImage);
+                // Update existing record with new filename but keep same hash
+                $this->updateExistingFile($existingFile, $filename, $extension, $fileData, $isImage);
+                return $this->getUpdatedFileData($existingFile, $filename, $extension, $fileData, $isImage);
             }
         }
         
