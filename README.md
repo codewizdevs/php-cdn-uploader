@@ -618,7 +618,7 @@ Specializing in:
 
 **Contact us for your next project:**
 - 🌐 Website: [https://codewizdev.com](https://codewizdev.com)
-- 📧 Email: [info@codewizdev.com](mailto:info@codewizdev.com)
+- 📧 Email: [hello@codewizdev.com](mailto:hello@codewizdev.com)
 - 💼 Services: Custom development, consulting, and technical solutions
 
 ---
