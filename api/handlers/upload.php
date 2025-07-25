@@ -1,4 +1,8 @@
 <?php
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../database.php';
+require_once __DIR__ . '/../auth.php';
+
 class UploadHandler {
     private $db;
     
@@ -7,110 +11,96 @@ class UploadHandler {
     }
     
     public function handle() {
-        // Auto-detect upload type and get file data
-        $uploadData = $this->detectAndGetUploadData();
-        $filename = $uploadData['filename'];
-        $fileData = $uploadData['file_data'];
-        
-        // Process upload
-        $fileData = $this->processUpload($fileData, $filename);
-        
-        // Return success response
-        echo json_encode([
-            'status' => 'success',
-            'message' => 'File uploaded successfully',
-            'data' => $fileData
-        ]);
+        try {
+            // Get upload data (multipart or base64)
+            $uploadData = $this->detectAndGetUploadData();
+            
+            if (!$uploadData) {
+                throw new Exception('No file data provided');
+            }
+            
+            $fileData = $uploadData['data'];
+            $filename = $uploadData['filename'] ?? '';
+            
+            // Process the upload
+            $result = $this->processUpload($fileData, $filename);
+            
+            echo json_encode([
+                'status' => 'success',
+                'message' => 'File uploaded successfully',
+                'data' => $result
+            ]);
+            
+        } catch (Exception $e) {
+            http_response_code(400);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Upload failed: ' . $e->getMessage()
+            ]);
+        }
     }
     
     private function detectAndGetUploadData() {
-        $filename = '';
-        $fileData = null;
-        
         // Check if it's a multipart upload
-        if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
-            // Multipart upload detected
-            $uploadedFile = $_FILES['file'];
+        if (!empty($_FILES['file'])) {
+            $file = $_FILES['file'];
             
-            // Check file size
-            if ($uploadedFile['size'] > MAX_FILE_SIZE) {
-                throw new Exception('File size exceeds 20MB limit');
+            if ($file['error'] !== UPLOAD_ERR_OK) {
+                throw new Exception('File upload error: ' . $file['error']);
             }
             
-            // Read file data
-            $fileData = file_get_contents($uploadedFile['tmp_name']);
-            if ($fileData === false) {
-                throw new Exception('Failed to read uploaded file');
+            if ($file['size'] > MAX_FILE_SIZE) {
+                throw new Exception('File too large. Maximum size is ' . (MAX_FILE_SIZE / 1024 / 1024) . 'MB');
             }
             
-            $filename = $_POST['filename'] ?? '';
+            $fileData = file_get_contents($file['tmp_name']);
+            $filename = $_POST['filename'] ?? $file['name'];
             
-        } else {
-            // Check if it's a JSON base64 upload
-            $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
-            if (strpos($contentType, 'application/json') !== false) {
-                $input = json_decode(file_get_contents('php://input'), true);
-                if (!$input) {
-                    throw new Exception('Invalid JSON input');
-                }
-                
-                $base64Data = $input['image'] ?? '';
-                if (empty($base64Data)) {
-                    throw new Exception('No image data provided in JSON');
-                }
-                
-                // Handle data URL format (data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...)
-                if (strpos($base64Data, 'data:') === 0) {
-                    // Extract the base64 part from data URL
-                    $parts = explode(',', $base64Data, 2);
-                    if (count($parts) !== 2) {
-                        throw new Exception('Invalid data URL format');
-                    }
-                    $base64Data = $parts[1];
-                }
-                
-                // Decode base64 data
-                $fileData = base64_decode($base64Data);
-                if ($fileData === false) {
-                    throw new Exception('Invalid base64 data');
-                }
-                
-                // Check file size
-                if (strlen($fileData) > MAX_FILE_SIZE) {
-                    throw new Exception('File size exceeds 20MB limit');
-                }
-                
-                $filename = $input['filename'] ?? '';
-                
-            } else {
-                // Check for multipart upload errors
-                if (isset($_FILES['file'])) {
-                    $error = $_FILES['file']['error'];
-                    $errorMessages = [
-                        UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize',
-                        UPLOAD_ERR_FORM_SIZE => 'File exceeds MAX_FILE_SIZE',
-                        UPLOAD_ERR_PARTIAL => 'File was only partially uploaded',
-                        UPLOAD_ERR_NO_FILE => 'No file was uploaded',
-                        UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
-                        UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
-                        UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload'
-                    ];
-                    throw new Exception($errorMessages[$error] ?? 'File upload failed');
-                } else {
-                    throw new Exception('No file data provided. Use multipart upload or JSON with base64 data.');
-                }
-            }
+            return [
+                'data' => $fileData,
+                'filename' => $filename
+            ];
         }
         
-        return [
-            'filename' => $filename,
-            'file_data' => $fileData
-        ];
+        // Check if it's a JSON base64 upload
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+        if (strpos($contentType, 'application/json') !== false) {
+            $input = file_get_contents('php://input');
+            $data = json_decode($input, true);
+            
+            if (!$data || !isset($data['image'])) {
+                throw new Exception('Invalid JSON data');
+            }
+            
+            // Extract base64 data from data URL format
+            $base64Data = $data['image'];
+            if (preg_match('/^data:([^;]+);base64,(.+)$/', $base64Data, $matches)) {
+                $base64Data = $matches[2];
+            }
+            
+            $fileData = base64_decode($base64Data);
+            if ($fileData === false) {
+                throw new Exception('Invalid base64 data');
+            }
+            
+            if (strlen($fileData) > MAX_FILE_SIZE) {
+                throw new Exception('File too large. Maximum size is ' . (MAX_FILE_SIZE / 1024 / 1024) . 'MB');
+            }
+            
+            $filename = $data['filename'] ?? '';
+            
+            return [
+                'data' => $fileData,
+                'filename' => $filename
+            ];
+        }
+        
+        return null;
     }
     
     private function processUpload($fileData, $filename) {
         // Calculate file hash for deduplication
-        $fileHash = sprintf('%08x', crc32($fileData));
+        $fileHash = md5($fileData);
         
         // Determine file type and extension
         $fileInfo = $this->getFileInfo($fileData);
@@ -179,204 +169,191 @@ class UploadHandler {
         return $this->createNewFileRecord($fileData, $finalFilename, $fileHash, $extension, $mimeType, $isImage);
     }
     
-    private function updateExistingFile($existingFile, $filename, $extension, $fileData, $isImage) {
-        // Update filename in database
-        $this->db->query(
-            "UPDATE cdn_files SET filename = ?, upload_date = ? WHERE id = ?",
-            [$filename, date('Y-m-d H:i:s'), $existingFile['id']]
-        );
+    private function updateExistingFile($existingFile, $newFilename, $extension, $fileData, $isImage) {
+        // Delete old files if filename changed
+        if ($existingFile['filename'] !== $newFilename) {
+            $this->deleteFiles($existingFile['filename'], $existingFile['thumb_filename']);
+        }
         
-        // Update physical file if filename changed
-        if ($existingFile['filename'] !== $filename) {
-            $oldPath = IMAGES_DIR . $existingFile['filename'];
-            $newPath = IMAGES_DIR . $filename;
+        // Save new file
+        $filePath = IMAGES_DIR . $newFilename;
+        file_put_contents($filePath, $fileData);
+        
+        // Process thumbnail if needed
+        $thumbFilename = '';
+        $thumbWidth = 0;
+        $thumbHeight = 0;
+        $thumbSize = 0;
+        
+        if (in_array(strtolower($extension), THUMBNAIL_EXTENSIONS) && $isImage) {
+            $thumbFilename = $newFilename;
+            $thumbData = $this->createThumbnail($fileData, $extension);
+            $thumbPath = THUMBS_DIR . $thumbFilename;
+            file_put_contents($thumbPath, $thumbData);
+            $thumbSize = strlen($thumbData);
             
-            if (file_exists($oldPath)) {
-                rename($oldPath, $newPath);
-            }
-            
-            // Update thumbnail if it exists
-            if ($existingFile['thumb_filename']) {
-                $oldThumbPath = THUMBS_DIR . $existingFile['thumb_filename'];
-                $newThumbPath = THUMBS_DIR . $filename;
-                
-                if (file_exists($oldThumbPath)) {
-                    rename($oldThumbPath, $newThumbPath);
-                    
-                    // Update thumbnail filename in database
-                    $this->db->query(
-                        "UPDATE cdn_files SET thumb_filename = ? WHERE id = ?",
-                        [$filename, $existingFile['id']]
-                    );
-                }
+            // Get thumbnail dimensions
+            $thumbInfo = getimagesizefromstring($thumbData);
+            if ($thumbInfo) {
+                $thumbWidth = $thumbInfo[0];
+                $thumbHeight = $thumbInfo[1];
             }
         }
+        
+        // Update database record
+        $this->db->execute(
+            "UPDATE cdn_files SET 
+                filename = ?, 
+                thumb_filename = ?, 
+                thumb_width = ?, 
+                thumb_height = ?, 
+                thumb_size = ?,
+                updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?",
+            [$newFilename, $thumbFilename, $thumbWidth, $thumbHeight, $thumbSize, $existingFile['id']]
+        );
     }
     
-    private function getUpdatedFileData($existingFile, $filename, $extension, $fileData, $isImage) {
-        // Return updated file data with new filename
+    private function getUpdatedFileData($existingFile, $newFilename, $extension, $fileData, $isImage) {
+        // Get updated record
+        $updatedRecord = $this->db->fetch(
+            "SELECT * FROM cdn_files WHERE id = ?",
+            [$existingFile['id']]
+        );
+        
         return [
-            'id' => $existingFile['id'],
-            'filename' => $filename,
-            'thumb_filename' => $filename, // Same filename for thumbnail
-            'file_hash' => $existingFile['file_hash'],
-            'original_width' => intval($existingFile['original_width']),
-            'original_height' => intval($existingFile['original_height']),
-            'width' => intval($existingFile['width']),
-            'height' => intval($existingFile['height']),
-            'thumb_width' => intval($existingFile['thumb_width']),
-            'thumb_height' => intval($existingFile['thumb_height']),
-            'file_size' => intval($existingFile['file_size']),
-            'thumb_size' => intval($existingFile['thumb_size']),
-            'extension' => $existingFile['extension'],
-            'mime_type' => $existingFile['mime_type'],
-            'upload_date' => date('Y-m-d H:i:s')
+            'id' => intval($updatedRecord['id']),
+            'filename' => $updatedRecord['filename'],
+            'thumb_filename' => $updatedRecord['thumb_filename'],
+            'file_hash' => $updatedRecord['file_hash'],
+            'original_width' => intval($updatedRecord['original_width']),
+            'original_height' => intval($updatedRecord['original_height']),
+            'width' => intval($updatedRecord['width']),
+            'height' => intval($updatedRecord['height']),
+            'thumb_width' => intval($updatedRecord['thumb_width']),
+            'thumb_height' => intval($updatedRecord['thumb_height']),
+            'file_size' => intval($updatedRecord['file_size']),
+            'thumb_size' => intval($updatedRecord['thumb_size']),
+            'extension' => $updatedRecord['extension'],
+            'mime_type' => $updatedRecord['mime_type'],
+            'created_at' => $updatedRecord['created_at'],
+            'updated_at' => $updatedRecord['updated_at']
         ];
     }
     
     private function createNewFileRecord($fileData, $filename, $fileHash, $extension, $mimeType, $isImage) {
         // Save main file
         $filePath = IMAGES_DIR . $filename;
-        if (file_put_contents($filePath, $fileData) === false) {
-            throw new Exception('Failed to save file');
-        }
+        file_put_contents($filePath, $fileData);
+        $fileSize = strlen($fileData);
         
-        // Initialize variables
-        $thumbFilename = '';
-        $thumbSize = 0;
+        // Get file dimensions
         $width = 0;
         $height = 0;
-        $thumbWidth = 0;
-        $thumbHeight = 0;
+        $originalWidth = 0;
+        $originalHeight = 0;
         
-        // Process image and create thumbnail if it's a supported image format
-        if ($isImage && in_array(strtolower($extension), THUMBNAIL_EXTENSIONS)) {
+        if ($isImage) {
             $imageInfo = getimagesizefromstring($fileData);
-            if ($imageInfo !== false) {
-                $width = $imageInfo[0];
-                $height = $imageInfo[1];
+            if ($imageInfo) {
+                $originalWidth = $imageInfo[0];
+                $originalHeight = $imageInfo[1];
                 
-                // Create image resource
-                $image = imagecreatefromstring($fileData);
-                if ($image) {
-                    // Resize image if needed
-                    $processedImage = $this->resizeImage($image, $width, $height, MAX_IMAGE_SIZE);
-                    $thumbImage = $this->resizeImage($image, $width, $height, MAX_THUMB_SIZE);
+                // Resize if needed
+                if ($originalWidth > MAX_IMAGE_SIZE || $originalHeight > MAX_IMAGE_SIZE) {
+                    $resizedData = $this->resizeImage($fileData, $extension);
+                    file_put_contents($filePath, $resizedData);
+                    $fileSize = strlen($resizedData);
                     
-                    // Save resized main image
-                    $this->saveImage($processedImage, $filePath, $extension);
-                    
-                    // Save thumbnail
-                    $thumbFilename = $filename; // Same filename for thumbnail
-                    $thumbPath = THUMBS_DIR . $thumbFilename;
-                    $this->saveImage($thumbImage, $thumbPath, $extension);
-                    
-                    // Get new dimensions and sizes
-                    $newDimensions = $this->getImageDimensions($processedImage);
-                    $thumbDimensions = $this->getImageDimensions($thumbImage);
-                    $width = $newDimensions['width'];
-                    $height = $newDimensions['height'];
-                    $thumbWidth = $thumbDimensions['width'];
-                    $thumbHeight = $thumbDimensions['height'];
-                    $thumbSize = filesize($thumbPath);
-                    
-                    // Clean up image resources
-                    imagedestroy($image);
-                    imagedestroy($processedImage);
-                    imagedestroy($thumbImage);
+                    $resizedInfo = getimagesizefromstring($resizedData);
+                    if ($resizedInfo) {
+                        $width = $resizedInfo[0];
+                        $height = $resizedInfo[1];
+                    }
+                } else {
+                    $width = $originalWidth;
+                    $height = $originalHeight;
                 }
             }
         }
         
-        // Ensure thumb_filename is never null for current database schema
-        if ($thumbFilename === null) {
-            $thumbFilename = ''; // Empty string instead of null for files without thumbnails
+        // Process thumbnail
+        $thumbFilename = '';
+        $thumbWidth = 0;
+        $thumbHeight = 0;
+        $thumbSize = 0;
+        
+        if (in_array(strtolower($extension), THUMBNAIL_EXTENSIONS) && $isImage) {
+            $thumbFilename = $filename;
+            $thumbData = $this->createThumbnail($fileData, $extension);
+            $thumbPath = THUMBS_DIR . $thumbFilename;
+            file_put_contents($thumbPath, $thumbData);
+            $thumbSize = strlen($thumbData);
+            
+            // Get thumbnail dimensions
+            $thumbInfo = getimagesizefromstring($thumbData);
+            if ($thumbInfo) {
+                $thumbWidth = $thumbInfo[0];
+                $thumbHeight = $thumbInfo[1];
+            }
         }
         
-        // Get final file size
-        $finalFileSize = filesize($filePath);
+        // Insert database record
+        $this->db->execute(
+            "INSERT INTO cdn_files (
+                filename, thumb_filename, file_hash, original_width, original_height,
+                width, height, thumb_width, thumb_height, file_size, thumb_size,
+                extension, mime_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                $filename, $thumbFilename, $fileHash, $originalWidth, $originalHeight,
+                $width, $height, $thumbWidth, $thumbHeight, $fileSize, $thumbSize,
+                $extension, $mimeType
+            ]
+        );
         
-        // Save to database
-        $dbData = [
+        $id = $this->db->lastInsertId();
+        
+        return [
+            'id' => intval($id),
             'filename' => $filename,
             'thumb_filename' => $thumbFilename,
             'file_hash' => $fileHash,
-            'original_width' => $width,
-            'original_height' => $height,
-            'width' => $width,
-            'height' => $height,
-            'thumb_width' => $thumbWidth,
-            'thumb_height' => $thumbHeight,
-            'file_size' => $finalFileSize,
-            'thumb_size' => $thumbSize,
+            'original_width' => intval($originalWidth),
+            'original_height' => intval($originalHeight),
+            'width' => intval($width),
+            'height' => intval($height),
+            'thumb_width' => intval($thumbWidth),
+            'thumb_height' => intval($thumbHeight),
+            'file_size' => intval($fileSize),
+            'thumb_size' => intval($thumbSize),
             'extension' => $extension,
             'mime_type' => $mimeType,
-            'upload_date' => date('Y-m-d H:i:s')
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
         ];
-        
-        // Insert new record
-        $this->db->query(
-            "INSERT INTO cdn_files (filename, thumb_filename, file_hash, original_width, original_height, 
-            width, height, thumb_width, thumb_height, file_size, thumb_size, extension, mime_type, upload_date) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [
-                $dbData['filename'], $dbData['thumb_filename'], $dbData['file_hash'], $dbData['original_width'], $dbData['original_height'],
-                $dbData['width'], $dbData['height'], $dbData['thumb_width'], $dbData['thumb_height'],
-                $dbData['file_size'], $dbData['thumb_size'], $dbData['extension'], $dbData['mime_type'],
-                $dbData['upload_date']
-            ]
-        );
-        $dbData['id'] = $this->db->lastInsertId();
-        
-        return $dbData;
     }
     
     private function getFileInfo($fileData) {
-        // Try to get image info first
-        $imageInfo = getimagesizefromstring($fileData);
-        if ($imageInfo !== false) {
-            $mimeType = $imageInfo['mime'];
-            $extension = $this->getExtensionFromMime($mimeType);
-            return [
-                'extension' => $extension,
-                'mime_type' => $mimeType,
-                'is_image' => true
-            ];
-        }
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_buffer($finfo, $fileData);
+        finfo_close($finfo);
         
-        // If not an image, try to determine video format by checking file header
-        $header = substr($fileData, 0, 12);
+        // Check if it's an image
+        $isImage = strpos($mimeType, 'image/') === 0;
         
-        // Video format detection
-        if (strpos($header, 'ftyp') !== false) {
-            // MP4, M4V, 3GP
-            if (strpos($header, 'mp4') !== false || strpos($header, 'M4V') !== false) {
-                return ['extension' => 'mp4', 'mime_type' => 'video/mp4', 'is_image' => false];
-            }
-            if (strpos($header, '3gp') !== false) {
-                return ['extension' => '3gp', 'mime_type' => 'video/3gpp', 'is_image' => false];
-            }
-        }
+        // Get extension from MIME type
+        $extension = $this->getExtensionFromMime($mimeType);
         
-        if (strpos($header, 'RIFF') === 0 && strpos($header, 'WEBM', 8) !== false) {
-            return ['extension' => 'webm', 'mime_type' => 'video/webm', 'is_image' => false];
-        }
-        
-        if (strpos($header, 'RIFF') === 0 && strpos($header, 'AVI', 8) !== false) {
-            return ['extension' => 'avi', 'mime_type' => 'video/x-msvideo', 'is_image' => false];
-        }
-        
-        if (strpos($header, 'GIF8') === 0) {
-            return ['extension' => 'gif', 'mime_type' => 'image/gif', 'is_image' => true];
-        }
-        
-        // Default to mp4 if we can't determine
-        return ['extension' => 'mp4', 'mime_type' => 'video/mp4', 'is_image' => false];
+        return [
+            'mime_type' => $mimeType,
+            'is_image' => $isImage,
+            'extension' => $extension
+        ];
     }
     
     private function getExtensionFromMime($mimeType) {
-        $mimeMap = [
-            // Images
+        $mimeToExt = [
             'image/jpeg' => 'jpg',
             'image/jpg' => 'jpg',
             'image/png' => 'png',
@@ -384,17 +361,16 @@ class UploadHandler {
             'image/webp' => 'webp',
             'image/bmp' => 'bmp',
             'image/tiff' => 'tiff',
-            'image/tif' => 'tif',
             'image/svg+xml' => 'svg',
             'image/x-icon' => 'ico',
             'image/avif' => 'avif',
             'image/heic' => 'heic',
             'image/heif' => 'heif',
-            // Videos
             'video/mp4' => 'mp4',
             'video/webm' => 'webm',
-            'video/x-msvideo' => 'avi',
+            'video/avi' => 'avi',
             'video/quicktime' => 'mov',
+            'video/x-msvideo' => 'avi',
             'video/x-ms-wmv' => 'wmv',
             'video/x-flv' => 'flv',
             'video/x-matroska' => 'mkv',
@@ -403,11 +379,123 @@ class UploadHandler {
             'video/ogg' => 'ogv'
         ];
         
-        return $mimeMap[$mimeType] ?? 'mp4';
+        return $mimeToExt[$mimeType] ?? 'bin';
+    }
+    
+    private function resizeImage($imageData, $extension) {
+        $image = imagecreatefromstring($imageData);
+        if (!$image) {
+            throw new Exception('Failed to create image from data');
+        }
+        
+        $originalWidth = imagesx($image);
+        $originalHeight = imagesy($image);
+        
+        // Calculate new dimensions
+        if ($originalWidth > $originalHeight) {
+            $newWidth = MAX_IMAGE_SIZE;
+            $newHeight = intval(($originalHeight * MAX_IMAGE_SIZE) / $originalWidth);
+        } else {
+            $newHeight = MAX_IMAGE_SIZE;
+            $newWidth = intval(($originalWidth * MAX_IMAGE_SIZE) / $originalHeight);
+        }
+        
+        // Create resized image
+        $resized = imagecreatetruecolor($newWidth, $newHeight);
+        
+        // Preserve transparency for PNG
+        if (strtolower($extension) === 'png') {
+            imagealphablending($resized, false);
+            imagesavealpha($resized, true);
+            $transparent = imagecolorallocatealpha($resized, 255, 255, 255, 127);
+            imagefill($resized, 0, 0, $transparent);
+        }
+        
+        imagecopyresampled($resized, $image, 0, 0, 0, 0, $newWidth, $newHeight, $originalWidth, $originalHeight);
+        
+        // Output to buffer
+        ob_start();
+        if (strtolower($extension) === 'jpg' || strtolower($extension) === 'jpeg') {
+            imagejpeg($resized, null, JPEG_QUALITY);
+        } elseif (strtolower($extension) === 'png') {
+            imagepng($resized, null, PNG_COMPRESSION);
+        } else {
+            imagepng($resized, null, PNG_COMPRESSION);
+        }
+        $resizedData = ob_get_clean();
+        
+        imagedestroy($image);
+        imagedestroy($resized);
+        
+        return $resizedData;
+    }
+    
+    private function createThumbnail($imageData, $extension) {
+        $image = imagecreatefromstring($imageData);
+        if (!$image) {
+            throw new Exception('Failed to create image from data');
+        }
+        
+        $originalWidth = imagesx($image);
+        $originalHeight = imagesy($image);
+        
+        // Calculate thumbnail dimensions
+        if ($originalWidth > $originalHeight) {
+            $thumbWidth = MAX_THUMB_SIZE;
+            $thumbHeight = intval(($originalHeight * MAX_THUMB_SIZE) / $originalWidth);
+        } else {
+            $thumbHeight = MAX_THUMB_SIZE;
+            $thumbWidth = intval(($originalWidth * MAX_THUMB_SIZE) / $originalHeight);
+        }
+        
+        // Create thumbnail
+        $thumbnail = imagecreatetruecolor($thumbWidth, $thumbHeight);
+        
+        // Preserve transparency for PNG
+        if (strtolower($extension) === 'png') {
+            imagealphablending($thumbnail, false);
+            imagesavealpha($thumbnail, true);
+            $transparent = imagecolorallocatealpha($thumbnail, 255, 255, 255, 127);
+            imagefill($thumbnail, 0, 0, $transparent);
+        }
+        
+        imagecopyresampled($thumbnail, $image, 0, 0, 0, 0, $thumbWidth, $thumbHeight, $originalWidth, $originalHeight);
+        
+        // Output to buffer
+        ob_start();
+        if (strtolower($extension) === 'jpg' || strtolower($extension) === 'jpeg') {
+            imagejpeg($thumbnail, null, JPEG_QUALITY);
+        } elseif (strtolower($extension) === 'png') {
+            imagepng($thumbnail, null, PNG_COMPRESSION);
+        } else {
+            imagepng($thumbnail, null, PNG_COMPRESSION);
+        }
+        $thumbnailData = ob_get_clean();
+        
+        imagedestroy($image);
+        imagedestroy($thumbnail);
+        
+        return $thumbnailData;
     }
     
     private function generateRandomFilename($extension) {
-        return uniqid() . '_' . time() . '.' . $extension;
+        return uniqid() . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
+    }
+    
+    private function generateUniqueFilename($filename) {
+        $pathInfo = pathinfo($filename);
+        $name = $pathInfo['filename'];
+        $extension = $pathInfo['extension'] ?? '';
+        
+        $counter = 2;
+        $newFilename = $filename;
+        
+        while ($this->db->fetch("SELECT id FROM cdn_files WHERE filename = ?", [$newFilename])) {
+            $newFilename = $name . '_' . $counter . '.' . $extension;
+            $counter++;
+        }
+        
+        return $newFilename;
     }
     
     private function normalizeFilename($filename) {
@@ -444,98 +532,35 @@ class UploadHandler {
     }
     
     private function ensureExtension($filename, $extension) {
-        $currentExt = pathinfo($filename, PATHINFO_EXTENSION);
-        if (empty($currentExt)) {
+        $pathInfo = pathinfo($filename);
+        $currentExtension = $pathInfo['extension'] ?? '';
+        
+        if (empty($currentExtension)) {
             return $filename . '.' . $extension;
         }
+        
         return $filename;
-    }
-    
-    private function generateThumbFilename($filename) {
-        return $filename;
-    }
-    
-    private function generateUniqueFilename($filename) {
-        $pathInfo = pathinfo($filename);
-        $name = $pathInfo['filename'];
-        $extension = $pathInfo['extension'];
-        $counter = 1;
-        $uniqueFilename = $filename;
-        
-        // Keep trying until we find a unique filename
-        while ($this->db->fetch("SELECT id FROM cdn_files WHERE filename = ?", [$uniqueFilename])) {
-            $counter++;
-            $uniqueFilename = $name . '_' . $counter . '.' . $extension;
-        }
-        
-        return $uniqueFilename;
-    }
-    
-    private function resizeImage($image, $width, $height, $maxSize) {
-        if ($width <= $maxSize && $height <= $maxSize) {
-            return $image;
-        }
-        
-        $ratio = min($maxSize / $width, $maxSize / $height);
-        $newWidth = round($width * $ratio);
-        $newHeight = round($height * $ratio);
-        
-        $resized = imagecreatetruecolor($newWidth, $newHeight);
-        
-        // Preserve transparency for PNG and GIF
-        imagealphablending($resized, false);
-        imagesavealpha($resized, true);
-        $transparent = imagecolorallocatealpha($resized, 255, 255, 255, 127);
-        imagefilledrectangle($resized, 0, 0, $newWidth, $newHeight, $transparent);
-        
-        imagecopyresampled($resized, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
-        
-        return $resized;
-    }
-    
-    private function saveImage($image, $path, $extension) {
-        $extension = strtolower($extension);
-        
-        switch ($extension) {
-            case 'jpg':
-            case 'jpeg':
-                imagejpeg($image, $path, JPEG_QUALITY);
-                break;
-            case 'png':
-                imagepng($image, $path, PNG_COMPRESSION);
-                break;
-            case 'gif':
-                imagegif($image, $path);
-                break;
-            case 'webp':
-                imagewebp($image, $path, JPEG_QUALITY);
-                break;
-            case 'bmp':
-                imagewbmp($image, $path);
-                break;
-            default:
-                imagejpeg($image, $path, JPEG_QUALITY);
-        }
-    }
-    
-    private function getImageDimensions($image) {
-        return [
-            'width' => imagesx($image),
-            'height' => imagesy($image)
-        ];
     }
     
     private function deleteFiles($filename, $thumbFilename) {
-        $imagePath = IMAGES_DIR . $filename;
-        $thumbPath = THUMBS_DIR . $thumbFilename;
-        
-        if (file_exists($imagePath)) {
-            unlink($imagePath);
+        // Delete main file
+        $filePath = IMAGES_DIR . $filename;
+        if (file_exists($filePath)) {
+            unlink($filePath);
         }
         
-        if ($thumbFilename && file_exists($thumbPath)) {
-            unlink($thumbPath);
+        // Delete thumbnail if exists
+        if (!empty($thumbFilename)) {
+            $thumbPath = THUMBS_DIR . $thumbFilename;
+            if (file_exists($thumbPath)) {
+                unlink($thumbPath);
+            }
         }
     }
 }
+
+// Handle the request
+$db = new Database();
+$handler = new UploadHandler($db);
+$handler->handle();
 ?> 

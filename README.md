@@ -12,7 +12,7 @@ A comprehensive, production-ready PHP-based CDN (Content Delivery Network) uploa
 - 🔐 **Secure API Authentication** - Single API key authentication system
 - 📁 **Multipart & Base64 Uploads** - Dual upload support with auto-detection
 - 🖼️ **Automatic Image Processing** - Resize images to configurable dimensions
-- 🎯 **Hash-Based Deduplication** - CRC32 hash prevents duplicate storage
+- 🎯 **Hash-Based Deduplication** - MD5 hash prevents duplicate storage
 - 📏 **Conditional Thumbnail Generation** - Creates thumbnails for JPG, JPEG, PNG
 - 🔍 **Advanced Search & Filtering** - Search by filename, extension, size, date
 - 📊 **Database Tracking** - Complete file metadata storage and retrieval
@@ -414,7 +414,7 @@ X-API-Key: your-secure-api-key-here
 
 ### Hash-Based Deduplication
 
-The system uses CRC32 hash-based deduplication:
+The system uses MD5 hash-based deduplication:
 
 - **Enabled** (`DEDUPLICATE_UPLOADS = true`): Same content = same file
 - **Disabled** (`DEDUPLICATE_UPLOADS = false`): Creates new records for all uploads
@@ -530,7 +530,7 @@ CREATE TABLE cdn_files (
   id INT AUTO_INCREMENT PRIMARY KEY,
   filename VARCHAR(255) NOT NULL UNIQUE,
   thumb_filename VARCHAR(255) NULL,
-  file_hash VARCHAR(8) NOT NULL UNIQUE,
+  file_hash VARCHAR(32) NOT NULL UNIQUE,
   original_width INT DEFAULT 0,
   original_height INT DEFAULT 0,
   width INT DEFAULT 0,
@@ -557,7 +557,7 @@ CREATE TABLE cdn_files (
 
 ## 🚀 Performance Features
 
-- **Hash-Based Lookups**: Fast CRC32 hash-based deduplication
+- **Hash-Based Lookups**: Fast MD5 hash-based deduplication
 - **Database Indexing**: Comprehensive indexes for all query patterns
 - **Image Optimization**: Configurable compression and resizing
 - **Pagination**: Efficient handling of large datasets
@@ -595,7 +595,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Built with PHP and MySQL
 - Image processing powered by GD Library
-- Hash-based deduplication for storage efficiency
+- MD5 hash-based deduplication for storage efficiency
 - Comprehensive error handling and validation
 
 ---
