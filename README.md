@@ -201,7 +201,7 @@ X-API-Key: your-secure-api-key-here
         "thumb_size": 12345,
         "extension": "jpg",
         "mime_type": "image/jpeg",
-        "upload_date": "2024-01-15 10:30:00"
+        "created_at": "2024-01-15 10:30:00"
     }
 }
 ```
@@ -272,7 +272,7 @@ X-API-Key: your-secure-api-key-here
                 "thumb_size": 12345,
                 "extension": "jpg",
                 "mime_type": "image/jpeg",
-                "upload_date": "2024-01-15 10:30:00",
+                "created_at": "2024-01-15 10:30:00",
                 "urls": {
                     "image": "https://cdn.yourdomain.com/img/my-photo.jpg",
                     "thumbnail": "https://cdn.yourdomain.com/thumbs/my-photo.jpg"
@@ -330,7 +330,7 @@ X-API-Key: your-secure-api-key-here
         "thumb_size": 12345,
         "extension": "jpg",
         "mime_type": "image/jpeg",
-        "upload_date": "2024-01-15 10:30:00",
+        "created_at": "2024-01-15 10:30:00",
         "urls": {
             "image": "https://cdn.yourdomain.com/img/my-photo.jpg",
             "thumbnail": "https://cdn.yourdomain.com/thumbs/my-photo.jpg"
@@ -382,7 +382,7 @@ X-API-Key: your-secure-api-key-here
                 "thumb_size": 12345,
                 "extension": "jpg",
                 "mime_type": "image/jpeg",
-                "upload_date": "2024-01-15 10:30:00",
+                "created_at": "2024-01-15 10:30:00",
                 "urls": {
                     "image": "https://cdn.yourdomain.com/img/vacation-photo.jpg",
                     "thumbnail": "https://cdn.yourdomain.com/thumbs/vacation-photo.jpg"
@@ -447,7 +447,7 @@ php migrate_files.php
 This script will:
 - Create database records for files without records
 - Generate thumbnails for JPG/JPEG/PNG files
-- Calculate CRC32 hashes for all files
+- Calculate MD5 hashes for all files
 - Update file creation dates
 
 ## 🧪 Testing
@@ -541,7 +541,6 @@ CREATE TABLE cdn_files (
   thumb_size BIGINT DEFAULT 0,
   extension VARCHAR(10) NOT NULL,
   mime_type VARCHAR(100) NOT NULL,
-  upload_date DATETIME NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
