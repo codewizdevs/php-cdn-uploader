@@ -54,4 +54,6 @@ package-lock.json
 
 # Test files
 test_*.php
-debug_*.php 
+debug_*.php
+comprehensive_test.php
+test_api_logic.php 
