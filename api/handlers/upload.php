@@ -145,10 +145,25 @@ class UploadHandler {
             if ($existingFile) {
                 // Force replace existing file
                 return $this->forceReplaceFile($existingFile, $fileData, $fileHash, $extension, $mimeType, $isImage);
+            } else {
+                // Force flag was set but file doesn't exist - skip hash deduplication
+                // and go straight to creating new record
+                $finalFilename = $filename;
+                $filenameConflict = $this->db->fetch(
+                    "SELECT * FROM cdn_files WHERE filename = ?",
+                    [$filename]
+                );
+                
+                if ($filenameConflict) {
+                    // Generate unique filename for filename conflicts
+                    $finalFilename = $this->generateUniqueFilename($filename);
+                }
+                
+                return $this->createNewFileRecord($fileData, $finalFilename, $fileHash, $extension, $mimeType, $isImage);
             }
         }
         
-        // Check for existing file by hash (deduplication)
+        // Check for existing file by hash (deduplication) - only when force=false
         $existingFile = $this->db->fetch(
             "SELECT * FROM cdn_files WHERE file_hash = ?",
             [$fileHash]
