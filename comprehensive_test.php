@@ -5,8 +5,8 @@
  */
 
 // Configuration
-$API_BASE = 'https://cdn.juicysearch.com/api/';
-$API_KEY = 'iqiLIkEtEqeYaXILEkoM';
+$API_BASE = 'https://cdn.yourdomain.com/api/';
+$API_KEY = 'YOUR_API_KEY_HERE';
 
 // Test results storage
 $testResults = [];
