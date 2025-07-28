@@ -13,6 +13,7 @@ A comprehensive, production-ready PHP-based CDN (Content Delivery Network) uploa
 - 📁 **Multipart & Base64 Uploads** - Dual upload support with auto-detection
 - 🖼️ **Automatic Image Processing** - Resize images to configurable dimensions
 - 🎯 **Hash-Based Deduplication** - MD5 hash prevents duplicate storage
+- 🔄 **Force File Replacement** - Replace existing files by filename with `force=true`
 - 📏 **Conditional Thumbnail Generation** - Creates thumbnails for JPG, JPEG, PNG
 - 🔍 **Advanced Search & Filtering** - Search by filename, extension, size, date
 - 📊 **Database Tracking** - Complete file metadata storage and retrieval
@@ -163,6 +164,7 @@ X-API-Key: your-secure-api-key-here
 ```
 file: [binary file data]
 filename: my-photo.jpg (optional)
+force: true (optional) - Force replace existing file with same filename
 ```
 
 #### Method 2: Base64 Upload
@@ -177,9 +179,14 @@ X-API-Key: your-secure-api-key-here
 ```json
 {
     "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD...",
-    "filename": "my-photo.jpg"
+    "filename": "my-photo.jpg",
+    "force": true
 }
 ```
+
+**Parameters:**
+- `filename` (optional): Custom filename for the uploaded file
+- `force` (optional): If `true`, replaces existing file with the same filename (ignores hash deduplication)
 
 **Response:**
 ```json

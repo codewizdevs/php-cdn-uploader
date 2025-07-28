@@ -315,6 +315,13 @@ require_once 'api/config.php';
                     <input type="text" id="filename" placeholder="Leave empty for auto-generated filename">
                 </div>
                 
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="forceReplace"> Force Replace
+                    </label>
+                    <small>If checked, will replace existing file with same filename (ignores hash deduplication)</small>
+                </div>
+                
                 <button id="uploadBtn" onclick="uploadMultipart()">Upload File</button>
             </div>
             
@@ -328,6 +335,13 @@ require_once 'api/config.php';
                 <div class="form-group">
                     <label for="base64Filename">Custom Filename (optional):</label>
                     <input type="text" id="base64Filename" placeholder="Leave empty for auto-generated filename">
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="forceReplaceBase64"> Force Replace
+                    </label>
+                    <small>If checked, will replace existing file with same filename (ignores hash deduplication)</small>
                 </div>
                 
                 <button id="base64UploadBtn" onclick="uploadBase64()">Upload Base64</button>
@@ -538,6 +552,7 @@ require_once 'api/config.php';
             const file = fileInput.files[0];
             const filename = filenameInput.value.trim();
             const apiKey = apiKeyInput.value.trim();
+            const forceReplace = document.getElementById('forceReplace').checked;
             
             if (!file) {
                 showResult('Please select a file first.', 'error', uploadResult);
@@ -558,6 +573,9 @@ require_once 'api/config.php';
                 formData.append('file', file);
                 if (filename) {
                     formData.append('filename', filename);
+                }
+                if (forceReplace) {
+                    formData.append('force', 'true');
                 }
                 
                 const response = await fetch(CDN_CONFIG.apiBase + '?action=upload', {
@@ -591,6 +609,7 @@ require_once 'api/config.php';
             const base64Data = base64Input.value.trim();
             const filename = base64Filename.value.trim();
             const apiKey = apiKeyInput.value.trim();
+            const forceReplace = document.getElementById('forceReplaceBase64').checked;
             
             if (!base64Data) {
                 showResult('Please enter base64 data.', 'error', uploadResult);
@@ -615,7 +634,8 @@ require_once 'api/config.php';
                     },
                     body: JSON.stringify({
                         image: base64Data,
-                        filename: filename || undefined
+                        filename: filename || undefined,
+                        force: forceReplace
                     })
                 });
                 

@@ -21,9 +21,10 @@ class UploadHandler {
             
             $fileData = $uploadData['data'];
             $filename = $uploadData['filename'] ?? '';
+            $force = $uploadData['force'] ?? false;
             
             // Process the upload
-            $result = $this->processUpload($fileData, $filename);
+            $result = $this->processUpload($fileData, $filename, $force);
             
             echo json_encode([
                 'status' => 'success',
@@ -55,10 +56,12 @@ class UploadHandler {
             
             $fileData = file_get_contents($file['tmp_name']);
             $filename = $_POST['filename'] ?? $file['name'];
+            $force = isset($_POST['force']) && $_POST['force'] === 'true';
             
             return [
                 'data' => $fileData,
-                'filename' => $filename
+                'filename' => $filename,
+                'force' => $force
             ];
         }
         
@@ -88,17 +91,19 @@ class UploadHandler {
             }
             
             $filename = $data['filename'] ?? '';
+            $force = isset($data['force']) && $data['force'] === true;
             
             return [
                 'data' => $fileData,
-                'filename' => $filename
+                'filename' => $filename,
+                'force' => $force
             ];
         }
         
         return null;
     }
     
-    private function processUpload($fileData, $filename) {
+    private function processUpload($fileData, $filename, $force = false) {
         // Calculate file hash for deduplication
         $fileHash = md5($fileData);
         
@@ -111,6 +116,36 @@ class UploadHandler {
         // Check if extension is allowed
         if (!in_array(strtolower($extension), ALLOWED_EXTENSIONS)) {
             throw new Exception('File type not allowed');
+        }
+        
+        // Generate filename if not provided
+        if (empty($filename)) {
+            $filename = $this->generateRandomFilename($extension);
+        } else {
+            // Normalize filename if enabled
+            $normalizedFilename = $this->normalizeFilename($filename);
+            if ($normalizedFilename === null) {
+                // If normalization resulted in empty name, generate random filename
+                $filename = $this->generateRandomFilename($extension);
+            } else {
+                $filename = $normalizedFilename;
+            }
+            
+            // Ensure filename has correct extension
+            $filename = $this->ensureExtension($filename, $extension);
+        }
+        
+        // Handle force flag - replace existing file by filename
+        if ($force) {
+            $existingFile = $this->db->fetch(
+                "SELECT * FROM cdn_files WHERE filename = ?",
+                [$filename]
+            );
+            
+            if ($existingFile) {
+                // Force replace existing file
+                return $this->forceReplaceFile($existingFile, $fileData, $fileHash, $extension, $mimeType, $isImage);
+            }
         }
         
         // Check for existing file by hash (deduplication)
@@ -129,23 +164,6 @@ class UploadHandler {
                 $this->updateExistingFile($existingFile, $filename, $extension, $fileData, $isImage);
                 return $this->getUpdatedFileData($existingFile, $filename, $extension, $fileData, $isImage);
             }
-        }
-        
-        // Generate filename if not provided
-        if (empty($filename)) {
-            $filename = $this->generateRandomFilename($extension);
-        } else {
-            // Normalize filename if enabled
-            $normalizedFilename = $this->normalizeFilename($filename);
-            if ($normalizedFilename === null) {
-                // If normalization resulted in empty name, generate random filename
-                $filename = $this->generateRandomFilename($extension);
-            } else {
-                $filename = $normalizedFilename;
-            }
-            
-            // Ensure filename has correct extension
-            $filename = $this->ensureExtension($filename, $extension);
         }
         
         // Handle filename conflicts (different content, same filename)
@@ -199,13 +217,120 @@ class UploadHandler {
             "UPDATE cdn_files SET 
                 filename = ?, 
                 thumb_filename = ?, 
+                file_hash = ?, 
+                original_width = ?, 
+                original_height = ?, 
+                width = ?, 
+                height = ?, 
                 thumb_width = ?, 
                 thumb_height = ?, 
-                thumb_size = ?,
-                updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?",
-            [$newFilename, $thumbFilename, $thumbWidth, $thumbHeight, $thumbSize, $existingFile['id']]
+                file_size = ?, 
+                thumb_size = ?, 
+                extension = ?, 
+                mime_type = ?, 
+                updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?",
+            [
+                $newFilename,
+                $thumbFilename,
+                md5($fileData),
+                $this->getImageDimensions($fileData, $isImage)['width'],
+                $this->getImageDimensions($fileData, $isImage)['height'],
+                $this->getImageDimensions($fileData, $isImage)['width'],
+                $this->getImageDimensions($fileData, $isImage)['height'],
+                $thumbWidth,
+                $thumbHeight,
+                strlen($fileData),
+                $thumbSize,
+                $extension,
+                $mimeType,
+                $existingFile['id']
+            ]
         );
+    }
+    
+    private function forceReplaceFile($existingFile, $fileData, $fileHash, $extension, $mimeType, $isImage) {
+        // Delete old files (both main file and thumbnail)
+        $this->deleteFiles($existingFile['filename'], $existingFile['thumb_filename']);
+        
+        // Save new file
+        $filePath = IMAGES_DIR . $existingFile['filename'];
+        file_put_contents($filePath, $fileData);
+        
+        // Process thumbnail if needed
+        $thumbFilename = '';
+        $thumbWidth = 0;
+        $thumbHeight = 0;
+        $thumbSize = 0;
+        
+        if (in_array(strtolower($extension), THUMBNAIL_EXTENSIONS) && $isImage) {
+            $thumbFilename = $existingFile['filename'];
+            $thumbData = $this->createThumbnail($fileData, $extension);
+            $thumbPath = THUMBS_DIR . $thumbFilename;
+            file_put_contents($thumbPath, $thumbData);
+            $thumbSize = strlen($thumbData);
+            
+            // Get thumbnail dimensions
+            $thumbInfo = getimagesizefromstring($thumbData);
+            if ($thumbInfo) {
+                $thumbWidth = $thumbInfo[0];
+                $thumbHeight = $thumbInfo[1];
+            }
+        }
+        
+        // Update database record with all new metadata
+        $this->db->query(
+            "UPDATE cdn_files SET 
+                thumb_filename = ?, 
+                file_hash = ?, 
+                original_width = ?, 
+                original_height = ?, 
+                width = ?, 
+                height = ?, 
+                thumb_width = ?, 
+                thumb_height = ?, 
+                file_size = ?, 
+                thumb_size = ?, 
+                extension = ?, 
+                mime_type = ?, 
+                updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?",
+            [
+                $thumbFilename,
+                $fileHash,
+                $this->getImageDimensions($fileData, $isImage)['width'],
+                $this->getImageDimensions($fileData, $isImage)['height'],
+                $this->getImageDimensions($fileData, $isImage)['width'],
+                $this->getImageDimensions($fileData, $isImage)['height'],
+                $thumbWidth,
+                $thumbHeight,
+                strlen($fileData),
+                $thumbSize,
+                $extension,
+                $mimeType,
+                $existingFile['id']
+            ]
+        );
+        
+        // Return updated file data
+        return [
+            'id' => intval($existingFile['id']),
+            'filename' => $existingFile['filename'],
+            'thumb_filename' => $thumbFilename,
+            'file_hash' => $fileHash,
+            'original_width' => $this->getImageDimensions($fileData, $isImage)['width'],
+            'original_height' => $this->getImageDimensions($fileData, $isImage)['height'],
+            'width' => $this->getImageDimensions($fileData, $isImage)['width'],
+            'height' => $this->getImageDimensions($fileData, $isImage)['height'],
+            'thumb_width' => $thumbWidth,
+            'thumb_height' => $thumbHeight,
+            'file_size' => strlen($fileData),
+            'thumb_size' => $thumbSize,
+            'extension' => $extension,
+            'mime_type' => $mimeType,
+            'created_at' => $existingFile['created_at'],
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
     }
     
     private function getUpdatedFileData($existingFile, $newFilename, $extension, $fileData, $isImage) {
@@ -572,6 +697,20 @@ class UploadHandler {
                 unlink($thumbPath);
             }
         }
+    }
+
+    private function getImageDimensions($fileData, $isImage) {
+        $width = 0;
+        $height = 0;
+
+        if ($isImage) {
+            $imageInfo = getimagesizefromstring($fileData);
+            if ($imageInfo) {
+                $width = $imageInfo[0];
+                $height = $imageInfo[1];
+            }
+        }
+        return ['width' => $width, 'height' => $height];
     }
 }
 ?> 
