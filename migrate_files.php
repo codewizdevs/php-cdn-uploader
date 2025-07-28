@@ -199,6 +199,7 @@ $processedFiles = 0;
 $createdRecords = 0;
 $updatedRecords = 0;
 $createdThumbnails = 0;
+$skippedRecords = 0;
 
 echo "🚀 Starting migration of {$totalFiles} files...\n\n";
 
@@ -311,33 +312,42 @@ foreach ($files as $filePath) {
             $thumbFilename = $filename;
         }
         
-        // Insert new record
-        $stmt = $pdo->prepare("
-            INSERT INTO cdn_files (
-                filename, thumb_filename, file_hash, original_width, original_height,
-                width, height, thumb_width, thumb_height, file_size, thumb_size,
-                extension, mime_type
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        
-        $stmt->execute([
-            $filename,
-            $thumbFilename,
-            $fileHash,
-            $originalWidth,
-            $originalHeight,
-            $width,
-            $height,
-            $thumbWidth,
-            $thumbHeight,
-            $fileSize,
-            $thumbSize,
-            $extension,
-            $mimeType
-        ]);
-        
-        $createdRecords++;
-        echo "  ✅ Record created successfully\n";
+        // Insert new record with duplicate handling
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO cdn_files (
+                    filename, thumb_filename, file_hash, original_width, original_height,
+                    width, height, thumb_width, thumb_height, file_size, thumb_size,
+                    extension, mime_type
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            
+            $stmt->execute([
+                $filename,
+                $thumbFilename,
+                $fileHash,
+                $originalWidth,
+                $originalHeight,
+                $width,
+                $height,
+                $thumbWidth,
+                $thumbHeight,
+                $fileSize,
+                $thumbSize,
+                $extension,
+                $mimeType
+            ]);
+            
+            $createdRecords++;
+            echo "  ✅ Record created successfully\n";
+        } catch (PDOException $e) {
+            if ($e->getCode() == 23000 && strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                echo "  ⚠️  Record already exists (hash collision), skipping...\n";
+                $skippedRecords++;
+            } else {
+                throw $e; // Re-throw if it's not a duplicate key error
+            }
+        }
         
     } elseif ($existingHashRecord && !$existingRecord) {
         // File with same hash exists but different filename - update the existing record
@@ -417,6 +427,7 @@ echo "📊 Summary:\n";
 echo "   • Total files processed: {$processedFiles}\n";
 echo "   • New records created: {$createdRecords}\n";
 echo "   • Records updated: {$updatedRecords}\n";
+echo "   • Records skipped (duplicates): {$skippedRecords}\n";
 echo "   • Thumbnails created: {$createdThumbnails}\n";
 echo "   • Hash algorithm: MD5\n";
 echo "   • Timestamps: created_at/updated_at\n";
