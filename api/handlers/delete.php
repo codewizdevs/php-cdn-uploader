@@ -7,26 +7,30 @@ class DeleteHandler {
     }
     
     public function handle() {
-        $filename = $_GET['filename'] ?? '';
+        $id = $_GET['id'] ?? '';
         
-        if (empty($filename)) {
-            throw new Exception('Filename is required');
+        if (empty($id)) {
+            throw new Exception('ID parameter is required');
+        }
+        
+        if (!is_numeric($id) || $id <= 0) {
+            throw new Exception('Invalid ID parameter');
         }
         
         // Get file record from database
         $file = $this->db->fetch(
-            "SELECT * FROM cdn_files WHERE filename = ?",
-            [$filename]
+            "SELECT * FROM cdn_files WHERE id = ?",
+            [$id]
         );
         
         if (!$file) {
-            throw new Exception('File not found');
+            throw new Exception('File not found with ID: ' . $id);
         }
         
         // Update updated_at timestamp before deletion (for audit trail)
         $this->db->query(
-            "UPDATE cdn_files SET updated_at = CURRENT_TIMESTAMP WHERE filename = ?",
-            [$filename]
+            "UPDATE cdn_files SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            [$id]
         );
         
         // Delete physical files
@@ -34,15 +38,16 @@ class DeleteHandler {
         
         // Delete database record
         $this->db->query(
-            "DELETE FROM cdn_files WHERE filename = ?",
-            [$filename]
+            "DELETE FROM cdn_files WHERE id = ?",
+            [$id]
         );
         
         echo json_encode([
             'status' => 'success',
             'message' => 'File deleted successfully',
             'data' => [
-                'filename' => $filename,
+                'id' => intval($id),
+                'filename' => $file['filename'],
                 'thumb_filename' => $file['thumb_filename']
             ]
         ]);

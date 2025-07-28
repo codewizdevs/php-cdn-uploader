@@ -217,16 +217,19 @@ X-API-Key: your-secure-api-key-here
 
 **POST** `/api/?action=delete`
 
-Delete a file and its thumbnail from the CDN.
+Delete a file and its thumbnail from the CDN by database ID.
 
 **Headers:**
 ```
 X-API-Key: your-secure-api-key-here
 ```
 
-**Request Body:**
+**Parameters:**
+- `id` (required): Database ID of the file to delete
+
+**Example:**
 ```
-filename: my-photo.jpg
+POST /api/?action=delete&id=123
 ```
 
 **Response:**
@@ -235,6 +238,7 @@ filename: my-photo.jpg
     "status": "success",
     "message": "File deleted successfully",
     "data": {
+        "id": 123,
         "filename": "my-photo.jpg",
         "thumb_filename": "my-photo.jpg"
     }
@@ -480,6 +484,12 @@ curl -X POST "https://cdn.yourdomain.com/api/?action=upload" \
 **List Files:**
 ```bash
 curl "https://cdn.yourdomain.com/api/?action=list&page=1&per_page=10" \
+  -H "X-API-Key: your-api-key"
+```
+
+**Delete File:**
+```bash
+curl -X POST "https://cdn.yourdomain.com/api/?action=delete&id=123" \
   -H "X-API-Key: your-api-key"
 ```
 
