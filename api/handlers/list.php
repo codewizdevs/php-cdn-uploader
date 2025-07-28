@@ -51,7 +51,7 @@ class ListHandler {
             $hasPrevPage = $page > 1;
             
             // Get files
-            $query = "SELECT * FROM cdn_files " . $whereClause . " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+            $query = "SELECT * FROM cdn_files " . $whereClause . " ORDER BY updated_at DESC LIMIT ? OFFSET ?";
             $params[] = $perPage;
             $params[] = $offset;
             

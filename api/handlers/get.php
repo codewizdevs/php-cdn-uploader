@@ -31,6 +31,18 @@ class GetHandler {
                 throw new Exception('File not found with ID: ' . $id);
             }
             
+            // Update updated_at timestamp when file is accessed
+            $this->db->query(
+                "UPDATE cdn_files SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                [$id]
+            );
+            
+            // Get updated file data
+            $file = $this->db->fetch(
+                "SELECT * FROM cdn_files WHERE id = ?",
+                [$id]
+            );
+            
             // Format response
             $response = [
                 'id' => intval($file['id']),

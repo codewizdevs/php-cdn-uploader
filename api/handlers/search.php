@@ -70,7 +70,7 @@ class SearchHandler {
             $hasPrevPage = $page > 1;
             
             // Get files
-            $searchQuery = "SELECT * FROM cdn_files " . $whereClause . " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+            $searchQuery = "SELECT * FROM cdn_files " . $whereClause . " ORDER BY updated_at DESC LIMIT ? OFFSET ?";
             $searchParams = array_merge($params, [$perPage, $offset]);
             $files = $this->db->fetchAll($searchQuery, $searchParams);
             

@@ -393,24 +393,36 @@ class UploadHandler {
     }
     
     private function getExistingFileData($existingFile) {
-        // Return existing file data without any changes
+        // Update updated_at timestamp when existing file is accessed (deduplication)
+        $this->db->query(
+            "UPDATE cdn_files SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            [$existingFile['id']]
+        );
+        
+        // Get updated file data
+        $updatedFile = $this->db->fetch(
+            "SELECT * FROM cdn_files WHERE id = ?",
+            [$existingFile['id']]
+        );
+        
+        // Return updated file data
         return [
-            'id' => intval($existingFile['id']),
-            'filename' => $existingFile['filename'],
-            'thumb_filename' => $existingFile['thumb_filename'],
-            'file_hash' => $existingFile['file_hash'],
-            'original_width' => intval($existingFile['original_width']),
-            'original_height' => intval($existingFile['original_height']),
-            'width' => intval($existingFile['width']),
-            'height' => intval($existingFile['height']),
-            'thumb_width' => intval($existingFile['thumb_width']),
-            'thumb_height' => intval($existingFile['thumb_height']),
-            'file_size' => intval($existingFile['file_size']),
-            'thumb_size' => intval($existingFile['thumb_size']),
-            'extension' => $existingFile['extension'],
-            'mime_type' => $existingFile['mime_type'],
-            'created_at' => $existingFile['created_at'],
-            'updated_at' => $existingFile['updated_at']
+            'id' => intval($updatedFile['id']),
+            'filename' => $updatedFile['filename'],
+            'thumb_filename' => $updatedFile['thumb_filename'],
+            'file_hash' => $updatedFile['file_hash'],
+            'original_width' => intval($updatedFile['original_width']),
+            'original_height' => intval($updatedFile['original_height']),
+            'width' => intval($updatedFile['width']),
+            'height' => intval($updatedFile['height']),
+            'thumb_width' => intval($updatedFile['thumb_width']),
+            'thumb_height' => intval($updatedFile['thumb_height']),
+            'file_size' => intval($updatedFile['file_size']),
+            'thumb_size' => intval($updatedFile['thumb_size']),
+            'extension' => $updatedFile['extension'],
+            'mime_type' => $updatedFile['mime_type'],
+            'created_at' => $updatedFile['created_at'],
+            'updated_at' => $updatedFile['updated_at']
         ];
     }
     

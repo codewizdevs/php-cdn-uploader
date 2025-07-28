@@ -23,6 +23,12 @@ class DeleteHandler {
             throw new Exception('File not found');
         }
         
+        // Update updated_at timestamp before deletion (for audit trail)
+        $this->db->query(
+            "UPDATE cdn_files SET updated_at = CURRENT_TIMESTAMP WHERE filename = ?",
+            [$filename]
+        );
+        
         // Delete physical files
         $this->deletePhysicalFiles($file['filename'], $file['thumb_filename']);
         
