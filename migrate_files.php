@@ -370,15 +370,31 @@ foreach ($files as $filePath) {
         // Update existing record
         echo "  🔄 Updating existing record...\n";
         
-        // Update creation date and hash
-        $stmt = $pdo->prepare("
-            UPDATE cdn_files SET 
-                file_hash = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE filename = ?
-        ");
+        // Check if the hash we're trying to set already exists in another record
+        $hashExistsElsewhere = $pdo->query("SELECT COUNT(*) FROM cdn_files WHERE file_hash = '{$fileHash}' AND filename != '{$filename}'")->fetchColumn();
         
-        $stmt->execute([$fileHash, $filename]);
+        if ($hashExistsElsewhere > 0) {
+            echo "  ⚠️  Hash already exists in another record, skipping hash update...\n";
+            
+            // Only update timestamp, not the hash
+            $stmt = $pdo->prepare("
+                UPDATE cdn_files SET 
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE filename = ?
+            ");
+            
+            $stmt->execute([$filename]);
+        } else {
+            // Update hash and timestamp
+            $stmt = $pdo->prepare("
+                UPDATE cdn_files SET 
+                    file_hash = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE filename = ?
+            ");
+            
+            $stmt->execute([$fileHash, $filename]);
+        }
         
         // Create thumbnail if missing and applicable
         if (in_array(strtolower($extension), THUMBNAIL_EXTENSIONS) && $isImage) {
