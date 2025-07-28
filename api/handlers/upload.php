@@ -137,29 +137,46 @@ class UploadHandler {
         
         // Handle force flag - replace existing file by filename
         if ($force) {
+            // 1. Check if target filename exists
             $existingFile = $this->db->fetch(
                 "SELECT * FROM cdn_files WHERE filename = ?",
                 [$filename]
             );
             
             if ($existingFile) {
-                // Force replace existing file
-                return $this->forceReplaceFile($existingFile, $fileData, $fileHash, $extension, $mimeType, $isImage);
-            } else {
-                // Force flag was set but file doesn't exist - skip hash deduplication
-                // and go straight to creating new record
-                $finalFilename = $filename;
-                $filenameConflict = $this->db->fetch(
-                    "SELECT * FROM cdn_files WHERE filename = ?",
-                    [$filename]
-                );
-                
-                if ($filenameConflict) {
-                    // Generate unique filename for filename conflicts
-                    $finalFilename = $this->generateUniqueFilename($filename);
+                // Filename exists - check hash
+                if ($existingFile['file_hash'] === $fileHash) {
+                    // Same content - update existing record
+                    return $this->forceReplaceFile($existingFile, $fileData, $fileHash, $extension, $mimeType, $isImage);
+                } else {
+                    // Different content - check if new hash exists elsewhere
+                    $hashMatch = $this->db->fetch(
+                        "SELECT * FROM cdn_files WHERE file_hash = ? AND id != ?",
+                        [$fileHash, $existingFile['id']]
+                    );
+                    if ($hashMatch) {
+                        // Hash exists elsewhere - delete target file and return existing file
+                        $this->deleteFiles($existingFile['filename'], $existingFile['thumb_filename']);
+                        $this->db->query("DELETE FROM cdn_files WHERE id = ?", [$existingFile['id']]);
+                        return $this->getExistingFileData($hashMatch);
+                    } else {
+                        // New hash - replace target file
+                        return $this->forceReplaceFile($existingFile, $fileData, $fileHash, $extension, $mimeType, $isImage);
+                    }
                 }
-                
-                return $this->createNewFileRecord($fileData, $finalFilename, $fileHash, $extension, $mimeType, $isImage);
+            } else {
+                // Filename doesn't exist - check if hash exists
+                $hashMatch = $this->db->fetch(
+                    "SELECT * FROM cdn_files WHERE file_hash = ?",
+                    [$fileHash]
+                );
+                if ($hashMatch) {
+                    // Hash exists - return existing file
+                    return $this->getExistingFileData($hashMatch);
+                } else {
+                    // Neither exists - create new
+                    return $this->createNewFileRecord($fileData, $filename, $fileHash, $extension, $mimeType, $isImage);
+                }
             }
         }
         
