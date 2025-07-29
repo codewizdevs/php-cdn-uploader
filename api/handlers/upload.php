@@ -361,7 +361,11 @@ class UploadHandler {
             'extension' => $extension,
             'mime_type' => $mimeType,
             'created_at' => $existingFile['created_at'],
-            'updated_at' => date('Y-m-d H:i:s')
+            'updated_at' => date('Y-m-d H:i:s'),
+            'urls' => [
+                'image' => CDN_IMAGES_URL . $existingFile['filename'],
+                'thumbnail' => $thumbFilename ? CDN_THUMBS_URL . $thumbFilename : null
+            ]
         ];
     }
     
@@ -388,7 +392,11 @@ class UploadHandler {
             'extension' => $updatedRecord['extension'],
             'mime_type' => $updatedRecord['mime_type'],
             'created_at' => $updatedRecord['created_at'],
-            'updated_at' => $updatedRecord['updated_at']
+            'updated_at' => $updatedRecord['updated_at'],
+            'urls' => [
+                'image' => CDN_IMAGES_URL . $updatedRecord['filename'],
+                'thumbnail' => $updatedRecord['thumb_filename'] ? CDN_THUMBS_URL . $updatedRecord['thumb_filename'] : null
+            ]
         ];
     }
     
@@ -422,7 +430,11 @@ class UploadHandler {
             'extension' => $updatedFile['extension'],
             'mime_type' => $updatedFile['mime_type'],
             'created_at' => $updatedFile['created_at'],
-            'updated_at' => $updatedFile['updated_at']
+            'updated_at' => $updatedFile['updated_at'],
+            'urls' => [
+                'image' => CDN_IMAGES_URL . $updatedFile['filename'],
+                'thumbnail' => $updatedFile['thumb_filename'] ? CDN_THUMBS_URL . $updatedFile['thumb_filename'] : null
+            ]
         ];
     }
     
@@ -515,7 +527,11 @@ class UploadHandler {
             'extension' => $extension,
             'mime_type' => $mimeType,
             'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s')
+            'updated_at' => date('Y-m-d H:i:s'),
+            'urls' => [
+                'image' => CDN_IMAGES_URL . $filename,
+                'thumbnail' => $thumbFilename ? CDN_THUMBS_URL . $thumbFilename : null
+            ]
         ];
     }
     
