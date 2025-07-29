@@ -878,7 +878,7 @@ require_once 'api/config.php';
                         </div>
                         <div class="file-actions">
                             <button class="btn-secondary" onclick="window.open('${file.urls.image}', '_blank')">View</button>
-                            <button class="btn-danger" onclick="deleteFile('${file.filename}')">Delete</button>
+                            <button class="btn-danger" onclick="deleteFile(${file.id})">Delete</button>
                         </div>
                     </div>
                 `;
@@ -900,15 +900,15 @@ require_once 'api/config.php';
         }
 
         // Delete file
-        async function deleteFile(filename) {
-            if (!confirm(`Are you sure you want to delete "${filename}"?`)) {
+        async function deleteFile(fileId) {
+            if (!confirm(`Are you sure you want to delete file with ID ${fileId}?`)) {
                 return;
             }
             
             const apiKey = apiKeyInput.value.trim();
             
             try {
-                const response = await fetch(`${CDN_CONFIG.apiBase}?action=delete&filename=${encodeURIComponent(filename)}`, {
+                const response = await fetch(`${CDN_CONFIG.apiBase}?action=delete&id=${encodeURIComponent(fileId)}`, {
                     method: 'POST',
                     headers: {
                         'X-API-Key': apiKey
