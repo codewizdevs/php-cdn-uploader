@@ -1,0 +1,59 @@
+# Configuration files with sensitive data
+api/config.php
+
+# Upload directories (user content)
+img/
+thumbs/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Database dumps
+*.sql
+!database_schema.sql
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Composer (if using)
+vendor/
+composer.lock
+
+# Node modules (if using)
+node_modules/
+package-lock.json
+
+# Test files
+test_*.php
+debug_*.php
+comprehensive_test.php
+test_api_logic.php 
